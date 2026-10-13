@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Монополия Мир — Онлайн</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    /* Extra lobby-only overrides */
+    body { display: flex; align-items: center; justify-content: center;
+           min-height: 100vh; background: radial-gradient(ellipse at center, #3a1a00 0%, #0d0500 100%); overflow: auto; }
+    /* Starfield background */
+    body::before {
+      content: ''; position: fixed; inset: 0; pointer-events: none;
+      background-image: radial-gradient(1px 1px at 20% 15%, rgba(245,166,35,.4) 0%, transparent 100%),
+                        radial-gradient(1px 1px at 60% 30%, rgba(255,255,255,.2) 0%, transparent 100%),
+                        radial-gradient(1px 1px at 80% 70%, rgba(245,166,35,.2) 0%, transparent 100%),
+                        radial-gradient(2px 2px at 40% 80%, rgba(255,255,255,.15) 0%, transparent 100%),
+                        radial-gradient(1px 1px at 90% 10%, rgba(245,166,35,.3) 0%, transparent 100%);
+    }
+  </style>
+</head>
+<body>
+
+<!-- ====================================================
+     LOBBY PANEL (single centered box)
+     ==================================================== -->
+<div class="lobby-panel" style="position:relative; z-index:1;">
+
+  <!-- Logo -->
+  <div class="logo-wrap">
+    <div class="logo-bar"></div>
+    <div class="logo-title">МОНОПОЛИЯ</div>
+    <div class="logo-sub">МИР · ОНЛАЙН</div>
+    <div class="logo-bar"></div>
+  </div>
+
+  <!-- Tabs: Создать / Присоединиться -->
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('create')">Создать игру</button>
+    <button class="tab-btn" onclick="switchTab('join')">Присоединиться</button>
+  </div>
+
+  <!-- ── CREATE tab ──────────────────────────────────────── -->
+  <div id="tab-create" class="tab-panel active">
+
+    <!-- Player name -->
+    <div class="input-group">
+      <label>Ваше имя</label>
+      <input id="create-name" type="text" placeholder="Введите имя..." maxlength="20">
+    </div>
+
+    <!-- Token color -->
+    <div class="input-group">
+      <label>Цвет фишки</label>
+      <div class="color-picker" id="create-color-picker"></div>
+    </div>
+
+    <!-- Game mode -->
+    <div class="input-group">
+      <label>Режим игры</label>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-secondary" id="mode-solo" onclick="setMode('solo')" style="flex:1;padding:10px;">
+          Каждый за себя
+        </button>
+        <button class="btn btn-secondary" id="mode-team" onclick="setMode('team')" style="flex:1;padding:10px;">
+          Команды
+        </button>
+      </div>
+    </div>
+
+    <!-- Team count (hidden in solo mode) -->
+    <div id="team-config" style="display:none;">
+      <div class="slider-row">
+        <label>Команды</label>
+        <input id="team-count" type="range" min="2" max="3" value="2" oninput="updateSlider('team-count','team-count-val')">
+        <span class="slider-val" id="team-count-val">2</span>
+      </div>
+    </div>
+
+    <!-- Settings -->
+    <div class="settings-section">
+      <div class="settings-title">Настройки</div>
+
+      <div class="slider-row">
+        <label>Игроки</label>
+        <input id="player-count" type="range" min="2" max="6" value="4" oninput="updateSlider('player-count','player-count-val')">
+        <span class="slider-val" id="player-count-val">4</span>
+      </div>
+
+      <div class="slider-row">
+        <label>Деньги</label>
+        <input id="start-money" type="range" min="1000" max="5000" step="500" value="2000" oninput="updateStartMoney()">
+        <span class="slider-val" id="start-money-val">$2000</span>
+      </div>
+
+      <div class="toggle-row">
+        <span>Режим аукциона</span>
+        <div class="toggle" id="auction-toggle" onclick="toggleOption('auction-toggle')"></div>
+      </div>
+
+      <div class="toggle-row">
+        <span>Быстрая игра</span>
+        <div class="toggle" id="fast-toggle" onclick="toggleOption('fast-toggle')"></div>
+      </div>
+    </div>
+
+    <button class="btn btn-primary" onclick="createGame()" id="create-btn">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+      Создать игру
+    </button>
+  </div>
+
+  <!-- ── JOIN tab ────────────────────────────────────────── -->
+  <div id="tab-join" class="tab-panel">
+
+    <div class="input-group">
+      <label>Ваше имя</label>
+      <input id="join-name" type="text" placeholder="Введите имя..." maxlength="20">
+    </div>
+
+    <div class="input-group">
+      <label>Цвет фишки</label>
+      <div class="color-picker" id="join-color-picker"></div>
+    </div>
+
+    <div class="input-group">
+      <label>Код комнаты</label>
+      <input id="join-code" type="text" placeholder="Вставьте код..."
+             maxlength="60" style="text-align:center; letter-spacing:2px; font-size:18px; text-transform:uppercase;">
+    </div>
+
+    <button class="btn btn-gold" onclick="joinGame()" id="join-btn">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+      Подключиться
+    </button>
+  </div>
+
+</div>
+
+<!-- ====================================================
+     WAITING ROOM OVERLAY
+     ==================================================== -->
+<div class="modal-overlay" id="waiting-overlay">
+  <div class="modal" style="max-width:520px;">
+    <div class="modal-title">Комната ожидания</div>
+
+    <!-- Room code box -->
+    <div class="room-code-box" id="room-code-section" style="display:none;">
+      <div class="room-code-label">Код для подключения</div>
+      <div class="room-code-value" id="room-code-display">------</div>
+      <div class="room-code-hint">Поделитесь этим кодом с другими игроками</div>
+      <button onclick="copyRoomCode()" style="margin-top:10px;background:rgba(245,166,35,.2);border:1px solid var(--gold);color:var(--gold-light);border-radius:6px;padding:6px 16px;cursor:pointer;font-size:12px;">
+        Копировать код
+      </button>
+    </div>
+
+    <!-- Player list -->
+    <div id="waiting-players" style="margin:16px 0; max-height:280px; overflow-y:auto;">
+      <!-- Filled dynamically -->
+    </div>
+
+    <!-- Host controls -->
+    <div id="host-controls" style="display:none;">
+      <div style="color:rgba(255,255,255,.5);font-size:12px;text-align:center;margin-bottom:12px;">
+        Минимум 2 игрока для начала
+      </div>
+      <button class="btn btn-primary" id="start-game-btn" onclick="startGame()" disabled>
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:18px;height:18px;"><path d="M8 5v14l11-7z"/></svg>
+        Начать игру
+      </button>
+    </div>
+
+    <div id="client-waiting" style="display:none; text-align:center; color:rgba(255,255,255,.5); font-size:13px; margin-top:12px;">
+      Ожидание хоста...
+    </div>
+
+    <button onclick="leaveRoom()" style="margin-top:12px;background:transparent;border:none;color:rgba(255,255,255,.4);cursor:pointer;font-size:12px;width:100%;text-align:center;">
+      Покинуть комнату
+    </button>
+  </div>
+</div>
+
+<!-- ====================================================
+     CONNECTING OVERLAY
+     ==================================================== -->
+<div class="connecting-overlay" id="connecting-overlay" style="display:none;">
+  <div>
+    <div class="spinner"></div>
+    <div class="connecting-text" id="connecting-text">Подключение...</div>
+  </div>
+</div>
+
+<!-- ====================================================
+     TOAST NOTIFICATION
+     ==================================================== -->
+<div class="toast" id="toast"></div>
+
+<!-- Scripts -->
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/network.js"></script>
+<script>
+  // ── State ─────────────────────────────────────────────────
+  let net         = null;
+  let myPeerId    = null;
+  let myName      = '';
+  let myColorIdx  = 0;
+  let isHost      = false;
+  let gameMode    = 'solo'; // 'solo' | 'team'
+  let teamCount   = 2;
+  let settings    = {};
+  let waitingPlayers = [];  // { peerId, name, colorIdx, team?, ready }
+
+  // ── Init color pickers ─────────────────────────────────────
+  function initColorPickers() {
+    ['create-color-picker', 'join-color-picker'].forEach((pickerId, pi) => {
+      const el = document.getElementById(pickerId);
+      PLAYER_TOKENS.forEach((t, i) => {
+        const sw = document.createElement('div');
+        sw.className = 'color-swatch' + (i === 0 ? ' selected' : '');
+        sw.style.background = t.color;
+        sw.title = t.name;
+        sw.dataset.idx = i;
+        sw.onclick = () => {
+          el.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
+          sw.classList.add('selected');
+          if (pi === 0) myColorIdx = i;  // create tab
+        };
+        el.appendChild(sw);
+      });
+    });
+  }
+
+  function switchTab(tab) {
+    document.querySelectorAll('.tab-btn').forEach((b,i)   => b.classList.toggle('active', (i===0) === (tab==='create')));
+    document.querySelectorAll('.tab-panel').forEach((p,i) => p.classList.toggle('active', (i===0) === (tab==='create')));
+  }
+
+  function setMode(mode) {
+    gameMode = mode;
+    document.getElementById('mode-solo').style.borderColor = mode==='solo' ? 'var(--gold)' : '';
+    document.getElementById('mode-team').style.borderColor = mode==='team' ? 'var(--gold)' : '';
+    document.getElementById('mode-solo').style.color       = mode==='solo' ? 'var(--gold)' : '';
+    document.getElementById('mode-team').style.color       = mode==='team' ? 'var(--gold)' : '';
+    document.getElementById('team-config').style.display   = mode==='team' ? 'block' : 'none';
+  }
+  setMode('solo'); // init
+
+  function updateSlider(id, valId) {
+    document.getElementById(valId).textContent = document.getElementById(id).value;
+  }
+  function updateStartMoney() {
+    document.getElementById('start-money-val').textContent = '$' + document.getElementById('start-money').value;
+  }
+  function toggleOption(id) {
+    document.getElementById(id).classList.toggle('on');
+  }
+
+  // ── Create game ─────────────────────────────────────────────
+  function createGame() {
+    myName = document.getElementById('create-name').value.trim();
+    if (!myName) { showToast('Введите ваше имя', 'error'); return; }
+
+    const colorSwatch = document.querySelector('#create-color-picker .color-swatch.selected');
+    myColorIdx = colorSwatch ? parseInt(colorSwatch.dataset.idx) : 0;
+
+    settings = {
+      startMoney:  parseInt(document.getElementById('start-money').value),
+      maxPlayers:  parseInt(document.getElementById('player-count').value),
+      auctionMode: document.getElementById('auction-toggle').classList.contains('on'),
+      fastMode:    document.getElementById('fast-toggle').classList.contains('on'),
+      teamMode:    gameMode === 'team',
+      teamCount:   gameMode === 'team' ? parseInt(document.getElementById('team-count').value) : 0,
+    };
+
+    showConnecting('Создание комнаты...');
+    isHost = true;
+
+    net = new PeerNetwork(
+      onNetMessage, onNetConnect, onNetDisconnect, onNetError
+    );
+
+    net.createRoom(myName, (res) => {
+      hideConnecting();
+      if (!res.ok) { showToast('Ошибка: ' + res.error, 'error'); return; }
+
+      myPeerId = res.peerId;
+      // Add host to waiting list
+      waitingPlayers = [{ peerId: myPeerId, name: myName, colorIdx: myColorIdx, isHost: true }];
+
+      showWaitingRoom(res.peerId); // pass full peer ID as room code
+    });
+  }
+
+  // ── Join game ─────────────────────────────────────────────
+  function joinGame() {
+    myName = document.getElementById('join-name').value.trim();
+    const code = document.getElementById('join-code').value.trim();
+
+    if (!myName) { showToast('Введите ваше имя', 'error'); return; }
+    if (!code)   { showToast('Введите код комнаты', 'error'); return; }
+
+    const colorSwatch = document.querySelector('#join-color-picker .color-swatch.selected');
+    myColorIdx = colorSwatch ? parseInt(colorSwatch.dataset.idx) : 0;
+
+    showConnecting('Подключение к комнате...');
+    isHost = false;
+
+    net = new PeerNetwork(
+      onNetMessage, onNetConnect, onNetDisconnect, onNetError
+    );
+
+    net.joinRoom(code, myName, (res) => {
+      hideConnecting();
+      if (!res.ok) {
+        showToast(res.error || 'Не удалось подключиться', 'error');
+        net.destroy(); net = null;
+        return;
+      }
+      // Send our info to host
+      net.sendToHost({ type: 'player_join', name: myName, colorIdx: myColorIdx });
+      showWaitingRoom(null); // client — no code to show
+    });
+  }
+
+  // ── Network handlers ────────────────────────────────────────
+  function onNetConnect(peerId) {
+    if (isHost) {
+      // Host: new client connected — will wait for player_join message
+      console.log('Client connected:', peerId);
+    }
+  }
+
+  function onNetDisconnect(peerId) {
+    if (isHost) {
+      waitingPlayers = waitingPlayers.filter(p => p.peerId !== peerId);
+      broadcastWaitingState();
+      renderWaitingPlayers();
+    } else {
+      showToast('Хост отключился', 'error');
+    }
+  }
+
+  function onNetError(msg) {
+    showToast(msg, 'error');
+    hideConnecting();
+  }
+
+  function onNetMessage(fromPeerId, rawData) {
+    let data;
+    try { data = typeof rawData === 'string' ? JSON.parse(rawData) : rawData; }
+    catch(e) { return; }
+
+    if (isHost) {
+      handleHostMessage(fromPeerId, data);
+    } else {
+      handleClientMessage(data);
+    }
+  }
+
+  function handleHostMessage(fromPeerId, data) {
+    switch (data.type) {
+      case 'player_join': {
+        // Check if name/color taken
+        const takenColors = waitingPlayers.map(p => p.colorIdx);
+        let colorIdx = data.colorIdx;
+        if (takenColors.includes(colorIdx)) {
+          colorIdx = PLAYER_TOKENS.findIndex((_,i) => !takenColors.includes(i));
+          if (colorIdx === -1) colorIdx = data.colorIdx;
+        }
+        waitingPlayers.push({ peerId: fromPeerId, name: data.name, colorIdx });
+        broadcastWaitingState();
+        renderWaitingPlayers();
+        updateStartButton();
+        break;
+      }
+    }
+  }
+
+  function handleClientMessage(data) {
+    switch (data.type) {
+      case 'waiting_state':
+        waitingPlayers = data.players;
+        renderWaitingPlayers();
+        break;
+      case 'game_start':
+        // Store game data and navigate
+        sessionStorage.setItem('gameData', JSON.stringify({
+          isHost:   false,
+          peerId:   net.myPeerId,
+          hostId:   data.hostId,
+          players:  data.players,
+          settings: data.settings,
+          myName,
+          myColorIdx,
+        }));
+        net.destroy(); // will reconnect in game.html
+        window.location.href = 'game.html';
+        break;
+    }
+  }
+
+  function broadcastWaitingState() {
+    if (!isHost) return;
+    net.broadcast({ type: 'waiting_state', players: waitingPlayers });
+  }
+
+  // ── Waiting room UI ─────────────────────────────────────────
+  function showWaitingRoom(roomCode) {
+    document.getElementById('waiting-overlay').classList.add('open');
+
+    if (isHost && roomCode) {
+      document.getElementById('room-code-section').style.display = 'block';
+      document.getElementById('room-code-display').textContent = roomCode;
+      document.getElementById('host-controls').style.display = 'block';
+      document.getElementById('client-waiting').style.display = 'none';
+    } else {
+      document.getElementById('room-code-section').style.display = 'none';
+      document.getElementById('host-controls').style.display = 'none';
+      document.getElementById('client-waiting').style.display = 'block';
+    }
+    renderWaitingPlayers();
+  }
+
+  function renderWaitingPlayers() {
+    const container = document.getElementById('waiting-players');
+    container.innerHTML = '';
+    waitingPlayers.forEach((p, i) => {
+      const token = PLAYER_TOKENS[p.colorIdx] || PLAYER_TOKENS[0];
+      const div = document.createElement('div');
+      div.className = 'player-slot';
+      div.innerHTML = `
+        <div class="player-slot-avatar" style="background:${token.color}; border: 3px solid ${token.dark};">
+          ${svgToken(token.color, token.dark)}
+        </div>
+        <div class="player-slot-info">
+          <div class="player-slot-name">${escHtml(p.name)}</div>
+          <div class="player-slot-status">${token.name}</div>
+        </div>
+        ${p.isHost ? '<span class="player-slot-badge">Хост</span>' : ''}
+      `;
+      container.appendChild(div);
+    });
+    updateStartButton();
+  }
+
+  function updateStartButton() {
+    const btn = document.getElementById('start-game-btn');
+    if (btn) btn.disabled = waitingPlayers.length < 2;
+  }
+
+  function copyRoomCode() {
+    const code = document.getElementById('room-code-display').textContent;
+    navigator.clipboard.writeText(code).then(() => showToast('Код скопирован!', 'success'));
+  }
+
+  function leaveRoom() {
+    if (net) { net.destroy(); net = null; }
+    document.getElementById('waiting-overlay').classList.remove('open');
+    waitingPlayers = [];
+  }
+
+  // ── Start game (host only) ──────────────────────────────────
+  function startGame() {
+    if (!isHost || waitingPlayers.length < 2) return;
+
+    const gameData = {
+      isHost:   true,
+      peerId:   net.myPeerId,
+      players:  waitingPlayers,
+      settings,
+      myName,
+      myColorIdx,
+    };
+
+    sessionStorage.setItem('gameData', JSON.stringify(gameData));
+
+    // Tell clients to go to game page
+    net.broadcast({
+      type:     'game_start',
+      hostId:   net.myPeerId,
+      players:  waitingPlayers,
+      settings,
+    });
+
+    // Small delay so broadcast goes out, then navigate
+    setTimeout(() => {
+      net.destroy();
+      window.location.href = 'game.html';
+    }, 500);
+  }
+
+  // ── SVG Token icon ─────────────────────────────────────────
+  function svgToken(color, dark) {
+    return `<svg viewBox="0 0 24 24" width="24" height="24">
+      <ellipse cx="12" cy="20" rx="6" ry="2" fill="${dark}" opacity=".5"/>
+      <circle cx="12" cy="10" r="6" fill="${color}"/>
+      <circle cx="10" cy="8" r="2" fill="rgba(255,255,255,.4)"/>
+      <rect x="8" y="15" width="8" height="4" rx="2" fill="${color}"/>
+      <rect x="9" y="16" width="6" height="2" rx="1" fill="${dark}" opacity=".4"/>
+    </svg>`;
+  }
+
+  // ── Toast ──────────────────────────────────────────────────
+  function showToast(msg, type='') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast show ' + type;
+    setTimeout(() => t.classList.remove('show'), 3000);
+  }
+
+  function showConnecting(msg) {
+    document.getElementById('connecting-text').textContent = msg;
+    document.getElementById('connecting-overlay').style.display = 'flex';
+  }
+  function hideConnecting() {
+    document.getElementById('connecting-overlay').style.display = 'none';
+  }
+
+  function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // Init
+  initColorPickers();
+</script>
+</body>
+</html>
